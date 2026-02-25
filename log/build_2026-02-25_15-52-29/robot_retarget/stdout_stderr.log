@@ -1,0 +1,31 @@
+running egg_info
+creating ../../build/robot_retarget/robot_retarget.egg-info
+writing ../../build/robot_retarget/robot_retarget.egg-info/PKG-INFO
+writing dependency_links to ../../build/robot_retarget/robot_retarget.egg-info/dependency_links.txt
+writing entry points to ../../build/robot_retarget/robot_retarget.egg-info/entry_points.txt
+writing requirements to ../../build/robot_retarget/robot_retarget.egg-info/requires.txt
+writing top-level names to ../../build/robot_retarget/robot_retarget.egg-info/top_level.txt
+writing manifest file '../../build/robot_retarget/robot_retarget.egg-info/SOURCES.txt'
+reading manifest file '../../build/robot_retarget/robot_retarget.egg-info/SOURCES.txt'
+writing manifest file '../../build/robot_retarget/robot_retarget.egg-info/SOURCES.txt'
+running build
+running build_py
+creating /home/focas/mcdepth_ws/build/robot_retarget/build
+creating /home/focas/mcdepth_ws/build/robot_retarget/build/lib
+creating /home/focas/mcdepth_ws/build/robot_retarget/build/lib/robot_retarget
+copying robot_retarget/__init__.py -> /home/focas/mcdepth_ws/build/robot_retarget/build/lib/robot_retarget
+running install
+running install_lib
+creating /home/focas/mcdepth_ws/install/robot_retarget/lib/python3.10/site-packages/robot_retarget
+copying /home/focas/mcdepth_ws/build/robot_retarget/build/lib/robot_retarget/__init__.py -> /home/focas/mcdepth_ws/install/robot_retarget/lib/python3.10/site-packages/robot_retarget
+byte-compiling /home/focas/mcdepth_ws/install/robot_retarget/lib/python3.10/site-packages/robot_retarget/__init__.py to __init__.cpython-310.pyc
+running install_data
+creating /home/focas/mcdepth_ws/install/robot_retarget/share/ament_index
+creating /home/focas/mcdepth_ws/install/robot_retarget/share/ament_index/resource_index
+creating /home/focas/mcdepth_ws/install/robot_retarget/share/ament_index/resource_index/packages
+copying resource/robot_retarget -> /home/focas/mcdepth_ws/install/robot_retarget/share/ament_index/resource_index/packages
+copying package.xml -> /home/focas/mcdepth_ws/install/robot_retarget/share/robot_retarget
+running install_egg_info
+Copying ../../build/robot_retarget/robot_retarget.egg-info to /home/focas/mcdepth_ws/install/robot_retarget/lib/python3.10/site-packages/robot_retarget-0.0.0-py3.10.egg-info
+running install_scripts
+writing list of installed files to '/home/focas/mcdepth_ws/build/robot_retarget/install.log'

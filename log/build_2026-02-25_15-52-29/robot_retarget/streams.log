@@ -1,0 +1,33 @@
+[0.469s] Invoking command in '/home/focas/mcdepth_ws/src/robot_retarget': PYTHONPATH=/home/focas/mcdepth_ws/build/robot_retarget/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/focas/mcdepth_ws/install/robot_retarget/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/robot_retarget build --build-base /home/focas/mcdepth_ws/build/robot_retarget/build install --record /home/focas/mcdepth_ws/build/robot_retarget/install.log --single-version-externally-managed install_data
+[0.628s] running egg_info
+[0.628s] creating ../../build/robot_retarget/robot_retarget.egg-info
+[0.628s] writing ../../build/robot_retarget/robot_retarget.egg-info/PKG-INFO
+[0.629s] writing dependency_links to ../../build/robot_retarget/robot_retarget.egg-info/dependency_links.txt
+[0.629s] writing entry points to ../../build/robot_retarget/robot_retarget.egg-info/entry_points.txt
+[0.629s] writing requirements to ../../build/robot_retarget/robot_retarget.egg-info/requires.txt
+[0.629s] writing top-level names to ../../build/robot_retarget/robot_retarget.egg-info/top_level.txt
+[0.629s] writing manifest file '../../build/robot_retarget/robot_retarget.egg-info/SOURCES.txt'
+[0.630s] reading manifest file '../../build/robot_retarget/robot_retarget.egg-info/SOURCES.txt'
+[0.630s] writing manifest file '../../build/robot_retarget/robot_retarget.egg-info/SOURCES.txt'
+[0.630s] running build
+[0.630s] running build_py
+[0.630s] creating /home/focas/mcdepth_ws/build/robot_retarget/build
+[0.631s] creating /home/focas/mcdepth_ws/build/robot_retarget/build/lib
+[0.631s] creating /home/focas/mcdepth_ws/build/robot_retarget/build/lib/robot_retarget
+[0.631s] copying robot_retarget/__init__.py -> /home/focas/mcdepth_ws/build/robot_retarget/build/lib/robot_retarget
+[0.631s] running install
+[0.631s] running install_lib
+[0.631s] creating /home/focas/mcdepth_ws/install/robot_retarget/lib/python3.10/site-packages/robot_retarget
+[0.631s] copying /home/focas/mcdepth_ws/build/robot_retarget/build/lib/robot_retarget/__init__.py -> /home/focas/mcdepth_ws/install/robot_retarget/lib/python3.10/site-packages/robot_retarget
+[0.631s] byte-compiling /home/focas/mcdepth_ws/install/robot_retarget/lib/python3.10/site-packages/robot_retarget/__init__.py to __init__.cpython-310.pyc
+[0.631s] running install_data
+[0.631s] creating /home/focas/mcdepth_ws/install/robot_retarget/share/ament_index
+[0.632s] creating /home/focas/mcdepth_ws/install/robot_retarget/share/ament_index/resource_index
+[0.632s] creating /home/focas/mcdepth_ws/install/robot_retarget/share/ament_index/resource_index/packages
+[0.632s] copying resource/robot_retarget -> /home/focas/mcdepth_ws/install/robot_retarget/share/ament_index/resource_index/packages
+[0.632s] copying package.xml -> /home/focas/mcdepth_ws/install/robot_retarget/share/robot_retarget
+[0.632s] running install_egg_info
+[0.633s] Copying ../../build/robot_retarget/robot_retarget.egg-info to /home/focas/mcdepth_ws/install/robot_retarget/lib/python3.10/site-packages/robot_retarget-0.0.0-py3.10.egg-info
+[0.633s] running install_scripts
+[0.647s] writing list of installed files to '/home/focas/mcdepth_ws/build/robot_retarget/install.log'
+[0.660s] Invoked command in '/home/focas/mcdepth_ws/src/robot_retarget' returned '0': PYTHONPATH=/home/focas/mcdepth_ws/build/robot_retarget/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/focas/mcdepth_ws/install/robot_retarget/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/robot_retarget build --build-base /home/focas/mcdepth_ws/build/robot_retarget/build install --record /home/focas/mcdepth_ws/build/robot_retarget/install.log --single-version-externally-managed install_data
