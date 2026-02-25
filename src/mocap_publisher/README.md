@@ -114,23 +114,27 @@ pip install mediapipe depthai opencv-python numpy mujoco
 cd ~/mcdepth_ws
 colcon build --packages-select mocap_publisher
 source install/setup.bash
+export ROS_DOMAIN_ID=144
 ```
 
-### Step 2 — Start the camera tracker (sends UDP data)
+### Step 2 — Start the camera tracker (sends ROS2 topics)
 ```bash
+conda activate ros2_humble
+export ROS_DOMAIN_ID=144
 python3 src/mocap_publisher/mocap_publisher/camera_tracker.py
 ```
 > Hold T-Pose until the progress bar reaches 100% to calibrate.
 
-### Step 3 — Start the ROS2 publisher node
+### Step 3 — Start the ROS2 publisher node (if needing UDP bridge)
 ```bash
+export ROS_DOMAIN_ID=144
 ros2 run mocap_publisher mocap_pub_node
 ```
 
 ### Step 4 — Subscribe and verify
 ```bash
-ros2 topic echo /mocap/joints
-ros2 topic echo /mocap/hand_orientation
+export ROS_DOMAIN_ID=144
+ros2 topic echo /human/skeletal_data
 ```
 
 ### Step 5 — Run MuJoCo retargeting (optional local sim)
