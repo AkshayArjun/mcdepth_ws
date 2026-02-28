@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OCRA · Live Optimizer</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Bebas+Neue&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#070809;--panel:#0c0e10;--border:#1a1f26;
+  --human:#00ffcc;--robot:#ff4d1a;--good:#00ff88;--warn:#ffcc00;
+  --muted:#3a4450;--text:#8a9bb0;--bright:#c8daea;
+}
+html,body{height:100%;background:var(--bg);color:var(--bright);font-family:'JetBrains Mono',monospace;overflow:hidden}
+#app{height:100vh;display:grid;grid-template-rows:44px 1fr;grid-template-columns:1fr 300px}
+
+/* Topbar */
+#topbar{grid-column:1/-1;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:18px}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:6px;color:var(--human);line-height:1}
+.sep{width:1px;height:22px;background:var(--border)}
+.pill{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--text)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .3s}
+.dot.live{background:var(--good);box-shadow:0 0 6px var(--good);animation:blink 2s infinite}
+.dot.warn{background:var(--warn)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.loss-big{margin-left:auto;font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;color:var(--good);transition:color .3s}
+.loss-big.high{color:var(--warn)}.loss-big.bad{color:var(--robot)}
+.loss-label{font-size:10px;color:var(--muted);margin-right:6px}
+
+/* Viewport */
+#viewport{background:var(--bg);position:relative;overflow:hidden;cursor:grab}
+#viewport:active{cursor:grabbing}
+#c3d{display:block;width:100%;height:100%}
+.view-hint{position:absolute;bottom:12px;left:14px;font-size:10px;color:var(--muted);line-height:1.8;pointer-events:none}
+
+/* Sidebar */
+#sidebar{border-left:1px solid var(--border);background:var(--panel);display:flex;flex-direction:column;overflow:hidden}
+.s-section{padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.s-title{font-size:9px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:10px}
+
+/* Connect */
+.connect-row{display:flex;gap:6px}
+#ws-input{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--bright);padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;border-radius:3px;outline:none;transition:border-color .2s}
+#ws-input:focus{border-color:var(--human)}
+#btn-connect{background:var(--human);color:var(--bg);border:none;padding:6px 14px;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px;border-radius:3px;cursor:pointer;transition:opacity .2s}
+#btn-connect:hover{opacity:.8}
+
+/* Metrics */
+.metric{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border)}
+.metric:last-child{border-bottom:none}
+.m-name{font-size:10px;color:var(--text)}
+.m-val{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px}
+.m-skel{color:var(--human)}.m-ori{color:var(--robot)}.m-tot{color:var(--good);font-size:24px}
+
+/* Joints */
+.j-row{display:grid;grid-template-columns:78px 1fr 46px;align-items:center;gap:8px;margin-bottom:7px}
+.j-name{font-size:9px;color:var(--text)}
+.j-track{height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.j-fill{height:100%;border-radius:2px;background:var(--robot);transition:width .12s ease}
+.j-fill.at-limit{background:#ff2222}
+.j-val{font-size:9px;color:var(--bright);text-align:right}
+
+/* Sparkline */
+#spark-wrap{padding:10px 16px 14px;flex-shrink:0;border-bottom:1px solid var(--border)}
+#spark{display:block;width:100%;height:48px}
+
+.s-scroll{overflow-y:auto;flex:1}
+
+/* Legend */
+.legend{display:flex;gap:14px;flex-wrap:wrap}
+.leg-item{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text)}
+.leg-line{width:18px;height:3px;border-radius:2px}
+
+/* Tip */
+.tip{margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px;font-size:9px;color:var(--muted);line-height:1.9}
+.tip code{color:var(--human);background:rgba(0,255,204,.07);padding:1px 4px;border-radius:2px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <span class="logo">OCRA</span>
+    <div class="sep"></div>
+    <div class="pill"><div class="dot" id="dot"></div><span id="status-txt">disconnected</span></div>
+    <div class="sep"></div>
+    <div class="pill" style="color:var(--human)">■ human</div>
+    <div class="pill" style="color:var(--robot)">■ robot FK</div>
+    <div class="loss-big" id="loss-display"><span class="loss-label">LOSS</span>—</div>
+  </div>
+
+  <div id="viewport">
+    <canvas id="c3d"></canvas>
+    <div class="view-hint">drag · rotate<br>scroll · zoom</div>
+  </div>
+
+  <div id="sidebar">
+    <div class="s-section">
+      <div class="s-title">Rosbridge</div>
+      <div class="connect-row">
+        <input id="ws-input" value="ws://localhost:9090" spellcheck="false"/>
+        <button id="btn-connect" onclick="connect()">GO</button>
+      </div>
+      <div class="tip">
+        Start first:<br>
+        <code>ros2 launch rosbridge_server rosbridge_websocket_launch.xml</code>
+      </div>
+    </div>
+    <div class="s-section">
+      <div class="s-title">Error Metrics</div>
+      <div class="metric"><span class="m-name">skeleton ε_s²</span><span class="m-val m-skel" id="m-skel">—</span></div>
+      <div class="metric"><span class="m-name">orientation ε_o²</span><span class="m-val m-ori"  id="m-ori">—</span></div>
+      <div class="metric"><span class="m-name">total loss</span><span class="m-val m-tot"  id="m-tot">—</span></div>
+    </div>
+    <div id="spark-wrap">
+      <div class="s-title">Loss History</div>
+      <canvas id="spark"></canvas>
+    </div>
+    <div class="s-scroll">
+      <div class="s-section">
+        <div class="s-title">Joint Angles · rad</div>
+        <div id="joint-panel"></div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">Legend</div>
+        <div class="legend">
+          <div class="leg-item"><div class="leg-line" style="background:var(--human)"></div>human chain</div>
+          <div class="leg-item"><div class="leg-line" style="background:var(--robot)"></div>robot FK</div>
+          <div class="leg-item"><div class="leg-line" style="border:1px dashed #fff3"></div>distance ε</div>
+        </div>
+        <div class="tip" style="margin-top:10px">
+          <b style="color:var(--bright)">EE glow color:</b><br>
+          <span style="color:var(--good)">■ green</span> — loss &lt; 0.01 (good)<br>
+          <span style="color:var(--warn)">■ yellow</span> — loss &lt; 0.05 (ok)<br>
+          <span style="color:var(--robot)">■ red</span> — loss &gt; 0.05 (bad)<br><br>
+          Dashed lines show the distances the optimizer is minimizing.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════
+const JNAMES  = ['waist','shoulder','elbow','wrist_angle','wrist_rotate'];
+const JLIMITS = [[-3.1416,3.1416],[-1.8849,1.9722],[-1.8849,1.6231],[-1.7453,2.1467],[-3.1416,3.1416]];
+
+const S = {
+  human:  { sh:[0,0,.3], el:[.2,0,.2], ha:[.35,0,.1] },
+  robot:  { base:[0,0,0], el:[.05,0,.305], ha:[.408,0,.305] },
+  joints: [0,0,0,0,0],
+  loss:   { skel:0, total:0 },
+  hist:   [],
+};
+
+// ══════════════════════════════════════════════════════
+// ROSBRIDGE
+// ══════════════════════════════════════════════════════
+let ws = null;
+
+function setStatus(type, msg) {
+  document.getElementById('dot').className = 'dot ' + type;
+  document.getElementById('status-txt').textContent = msg;
+}
+
+function connect() {
+  const url = document.getElementById('ws-input').value.trim();
+  if (ws) try { ws.close(); } catch(e) {}
+  setStatus('warn','connecting…');
+  ws = new WebSocket(url);
+  ws.onopen = () => {
+    setStatus('live','connected');
+    [['/human/skeletal_data','geometry_msgs/PoseArray'],
+     ['/rx200/arm_controller/joint_trajectory','trajectory_msgs/JointTrajectory'],
+    ].forEach(([topic,type]) => ws.send(JSON.stringify({op:'subscribe',topic,type})));
+  };
+  ws.onclose = () => setStatus('','disconnected');
+  ws.onerror = () => setStatus('warn','error — is rosbridge running?');
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.op === 'publish') onMsg(m.topic, m.msg);
+  };
+}
+
+function onMsg(topic, msg) {
+  if (topic === '/human/skeletal_data' && msg.poses.length >= 3) {
+    S.human.sh = p2a(msg.poses[0]);
+    S.human.el = p2a(msg.poses[1]);
+    S.human.ha = p2a(msg.poses[2]);
+  }
+  if (topic === '/rx200/arm_controller/joint_trajectory' && msg.points.length) {
+    msg.joint_names.forEach((n,i) => {
+      const idx = JNAMES.indexOf(n);
+      if (idx >= 0) S.joints[idx] = msg.points[0].positions[i];
+    });
+    fkUpdate();
+    uiUpdate();
+  }
+}
+
+const p2a = pose => [pose.position.x, pose.position.y, pose.position.z];
+
+// ══════════════════════════════════════════════════════
+// FK  (PoE, space frame)
+// ══════════════════════════════════════════════════════
+const SCREWS = [
+  [0,0,1,  0,       0,    0],
+  [0,1,0, -0.10457, 0,    0],
+  [0,1,0, -0.30457, 0,    0.05],
+  [0,1,0, -0.30457, 0,    0.25],
+  [1,0,0,  0,  0.30457,   0],
+];
+
+function mm4(A,B){
+  const R=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,1]];
+  for(let i=0;i<4;i++) for(let j=0;j<4;j++){R[i][j]=0;for(let k=0;k<4;k++)R[i][j]+=A[i][k]*B[k][j];}
+  return R;
+}
+
+function expSE3(sc, th) {
+  const w=sc.slice(0,3), v=sc.slice(3,6);
+  const s=Math.sin(th), c=Math.cos(th);
+  const W=[[0,-w[2],w[1]],[w[2],0,-w[0]],[-w[1],w[0],0]];
+  const W2=[[0,0,0],[0,0,0],[0,0,0]];
+  for(let i=0;i<3;i++) for(let j=0;j<3;j++) for(let k=0;k<3;k++) W2[i][j]+=W[i][k]*W[k][j];
+  const R=[[1,0,0],[0,1,0],[0,0,1]];
+  for(let i=0;i<3;i++) for(let j=0;j<3;j++) R[i][j]+=s*W[i][j]+(1-c)*W2[i][j];
+  const p=[0,0,0];
+  for(let i=0;i<3;i++){
+    p[i]=th*v[i];
+    for(let j=0;j<3;j++) p[i]+=(1-c)*W[i][j]*v[j];
+    let w2v=0; for(let j=0;j<3;j++) w2v+=W2[i][j]*v[j];
+    p[i]+=(th-s)*w2v;
+  }
+  return [[R[0][0],R[0][1],R[0][2],p[0]],[R[1][0],R[1][1],R[1][2],p[1]],[R[2][0],R[2][1],R[2][2],p[2]],[0,0,0,1]];
+}
+
+function tPos(T){return[T[0][3],T[1][3],T[2][3]];}
+
+function pose4(p){return[[1,0,0,p[0]],[0,1,0,p[1]],[0,0,1,p[2]],[0,0,0,1]];}
+
+function fkUpdate() {
+  const q=S.joints;
+  let T=[[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]];
+  T=mm4(T,expSE3(SCREWS[0],q[0]));
+  T=mm4(T,expSE3(SCREWS[1],q[1]));
+  S.robot.el=tPos(mm4(T,pose4([.05,0,.30457])));
+  T=mm4(T,expSE3(SCREWS[2],q[2]));
+  T=mm4(T,expSE3(SCREWS[3],q[3]));
+  T=mm4(T,expSE3(SCREWS[4],q[4]));
+  S.robot.ha=tPos(mm4(T,pose4([.408575,0,.30457])));
+}
+
+// ══════════════════════════════════════════════════════
+// LOSS (display approximation)
+// ══════════════════════════════════════════════════════
+function d3(a,b){return Math.sqrt((a[0]-b[0])**2+(a[1]-b[1])**2+(a[2]-b[2])**2);}
+function dot3(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];}
+function sub3(a,b){return[a[0]-b[0],a[1]-b[1],a[2]-b[2]];}
+function len3(a){return Math.sqrt(dot3(a,a));}
+
+function ptSeg(p,a,b){
+  const ab=sub3(b,a),ap=sub3(p,a);
+  const t=Math.max(0,Math.min(1,dot3(ap,ab)/(dot3(ab,ab)+1e-9)));
+  return len3(sub3(p,a.map((v,i)=>v+t*ab[i])));
+}
+
+function chainDist(p,chain){
+  let d=Infinity;
+  for(let i=0;i<chain.length-1;i++) d=Math.min(d,ptSeg(p,chain[i],chain[i+1]));
+  return d;
+}
+
+function closestOnChain(p,chain){
+  let best=null,bestD=Infinity;
+  for(let s=0;s<chain.length-1;s++){
+    const a=chain[s],b=chain[s+1];
+    const ab=sub3(b,a),ap=sub3(p,a);
+    const t=Math.max(0,Math.min(1,dot3(ap,ab)/(dot3(ab,ab)+1e-9)));
+    const cp=a.map((v,i)=>v+t*ab[i]);
+    const dd=len3(sub3(p,cp));
+    if(dd<bestD){bestD=dd;best=cp;}
+  }
+  return best;
+}
+
+function lossUpdate(){
+  const h=[S.human.sh,S.human.el,S.human.ha];
+  const r=[S.robot.base,S.robot.el,S.robot.ha];
+  const ell=d3(h[0],h[1])+d3(h[1],h[2])+d3(r[0],r[1])+d3(r[1],r[2])+1e-9;
+  const sk=(chainDist(h[1],r)+chainDist(h[2],r)+chainDist(r[1],h)+chainDist(r[2],h))/ell;
+  S.loss.skel=sk;
+  S.loss.total=0.67*sk*sk;
+  S.hist.push(S.loss.total);
+  if(S.hist.length>150) S.hist.shift();
+}
+
+// ══════════════════════════════════════════════════════
+// UI
+// ══════════════════════════════════════════════════════
+function uiUpdate(){
+  lossUpdate();
+  const L=S.loss.total;
+
+  // Topbar loss
+  const ld=document.getElementById('loss-display');
+  ld.innerHTML=`<span class="loss-label">LOSS</span>${L.toFixed(4)}`;
+  ld.className='loss-big'+(L>0.05?' bad':L>0.01?' high':'');
+
+  document.getElementById('m-skel').textContent=S.loss.skel.toFixed(4);
+  document.getElementById('m-ori').textContent='—';
+  document.getElementById('m-tot').textContent=L.toFixed(4);
+
+  // Joints
+  const panel=document.getElementById('joint-panel');
+  if(!panel.children.length){
+    JNAMES.forEach((n,i)=>{
+      const row=document.createElement('div');row.className='j-row';
+      row.innerHTML=`<span class="j-name">${n}</span>
+        <div class="j-track"><div class="j-fill" id="jf${i}" style="width:50%"></div></div>
+        <span class="j-val" id="jv${i}">0.000</span>`;
+      panel.appendChild(row);
+    });
+  }
+  JNAMES.forEach((_,i)=>{
+    const q=S.joints[i],[lo,hi]=JLIMITS[i];
+    const pct=((q-lo)/(hi-lo))*100;
+    const bar=document.getElementById('jf'+i);
+    if(bar){bar.style.width=Math.max(1,pct)+'%';bar.className='j-fill'+(Math.abs(pct)<2||pct>98?' at-limit':'');}
+    const v=document.getElementById('jv'+i);
+    if(v) v.textContent=q.toFixed(3);
+  });
+
+  sparkDraw();
+}
+
+function sparkDraw(){
+  const cv=document.getElementById('spark');
+  const W=cv.offsetWidth,H=cv.offsetHeight;
+  cv.width=W*devicePixelRatio;cv.height=H*devicePixelRatio;
+  const ctx=cv.getContext('2d');ctx.scale(devicePixelRatio,devicePixelRatio);
+  const h=S.hist;if(h.length<2)return;
+  const mx=Math.max(...h,.001);
+  ctx.clearRect(0,0,W,H);
+  ctx.beginPath();
+  h.forEach((v,i)=>{const x=(i/(h.length-1))*W,y=H-(v/mx)*(H-4)-2;i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+  ctx.strokeStyle='#00ffcc';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();
+  const g2=ctx.createLinearGradient(0,0,0,H);
+  g2.addColorStop(0,'rgba(0,255,204,.15)');g2.addColorStop(1,'rgba(0,255,204,0)');
+  ctx.fillStyle=g2;ctx.fill();
+}
+
+// ══════════════════════════════════════════════════════
+// 3D CANVAS
+// ══════════════════════════════════════════════════════
+const cv=document.getElementById('c3d'),g3=cv.getContext('2d');
+let cam={az:.7,el:.4,zoom:0};
+let drag=null;
+
+cv.addEventListener('mousedown',e=>{drag={x:e.clientX,y:e.clientY,az:cam.az,el:cam.el};});
+window.addEventListener('mousemove',e=>{if(!drag)return;cam.az=drag.az+(e.clientX-drag.x)*.006;cam.el=Math.max(-1.3,Math.min(1.3,drag.el-(e.clientY-drag.y)*.006));});
+window.addEventListener('mouseup',()=>drag=null);
+cv.addEventListener('wheel',e=>{cam.zoom=Math.max(80,Math.min(1400,cam.zoom-e.deltaY*.8));e.preventDefault();},{passive:false});
+
+function initZoom(){cam.zoom=Math.min(cv.offsetWidth,cv.offsetHeight)*.82;}
+
+function proj(p){
+  const[x,y,z]=p;
+  const ca=Math.cos(cam.az),sa=Math.sin(cam.az),ce=Math.cos(cam.el),se=Math.sin(cam.el);
+  const rx=ca*x+sa*y,ry=-sa*x+ca*y,rz=z;
+  const sx=rx, sy=ce*rz+se*ry;
+  const W=cv.width/devicePixelRatio,H=cv.height/devicePixelRatio;
+  return[W/2+sx*cam.zoom,H/2-sy*cam.zoom];
+}
+
+function line3d(a,b,col,lw,dash){
+  const pa=proj(a),pb=proj(b);
+  g3.beginPath();g3.strokeStyle=col;g3.lineWidth=lw;
+  g3.setLineDash(dash||[]);
+  g3.moveTo(pa[0],pa[1]);g3.lineTo(pb[0],pb[1]);g3.stroke();
+  g3.setLineDash([]);
+}
+
+function dot3d(p,r,fill,glow){
+  const pp=proj(p);g3.beginPath();g3.arc(pp[0],pp[1],r,0,Math.PI*2);
+  if(glow){g3.shadowColor=fill;g3.shadowBlur=glow;}
+  g3.fillStyle=fill;g3.fill();g3.shadowBlur=0;
+}
+
+function txt3d(p,t,col){
+  const pp=proj(p);g3.fillStyle=col;g3.font="10px 'JetBrains Mono',monospace";
+  g3.fillText(t,pp[0]+7,pp[1]+4);
+}
+
+function renderFrame(){
+  const W=cv.offsetWidth,H=cv.offsetHeight;
+  cv.width=W*devicePixelRatio;cv.height=H*devicePixelRatio;
+  g3.scale(devicePixelRatio,devicePixelRatio);
+  if(!cam.zoom) initZoom();
+  g3.clearRect(0,0,W,H);
+
+  // Grid
+  for(let i=0;i<=10;i++){
+    const v=-0.5+i*.1;
+    line3d([v,-.001,-.5],[v,-.001,.5],'rgba(26,31,38,.8)',1);
+    line3d([-.5,-.001,v],[.5,-.001,v],'rgba(26,31,38,.8)',1);
+  }
+
+  // Axes
+  [[.15,0,0],'#ff4444','X',[0,.15,0],'#44dd44','Y',[0,0,.15],'#4488ff','Z'].forEach((_,i,a)=>{
+    if(i%3===0){line3d([0,0,0],a[i],a[i+1],1.5);txt3d(a[i],a[i+2],a[i+1]);}
+  });
+
+  const h=[S.human.sh,S.human.el,S.human.ha];
+  const r=[S.robot.base,S.robot.el,S.robot.ha];
+
+  // Distance lines (what optimizer minimizes)
+  h.forEach(hp=>{
+    const cp=closestOnChain(hp,r);
+    if(cp) line3d(hp,cp,'rgba(255,255,255,0.15)',1,[4,5]);
+  });
+
+  // Human chain
+  line3d(h[0],h[1],'#00ffcc',2.5);line3d(h[1],h[2],'#00ffcc',2.5);
+  h.forEach((p,i)=>{dot3d(p,i?4:5,'#00ffcc',12);txt3d(p,['sh','el','ha'][i],'#00ffcc');});
+
+  // Robot chain
+  line3d(r[0],r[1],'#ff4d1a',2.5);line3d(r[1],r[2],'#ff4d1a',2.5);
+  r.forEach((p,i)=>{dot3d(p,i?4:5,'#ff4d1a',12);txt3d(p,['base','el','EE'][i],'#ff4d1a');});
+
+  // EE glow by loss
+  const lc=S.loss.total>0.05?'#ff2222':S.loss.total>0.01?'#ffaa00':'#00ff88';
+  dot3d(r[2],9,lc,24);
+
+  requestAnimationFrame(renderFrame);
+}
+
+// ── Boot ──────────────────────────────
+fkUpdate();uiUpdate();renderFrame();
+setTimeout(connect,500);
+</script>
+</body>
+</html>
