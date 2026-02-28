@@ -126,6 +126,7 @@ def ocra_loss(joint_angles, target_flat, weights):
 
     alpha = weights[0]
     beta = weights[1]
+    gamma = weights[2]
     
     ROBOT_BASE = jnp.array([0.0, 0.0, 0.0])  # Assuming the robot base is at the origin
     r_elbow, r_hand, r_rot = forward_kinematics(joint_angles)
@@ -175,7 +176,9 @@ def ocra_loss(joint_angles, target_flat, weights):
     orient_err = theta_d / jnp.pi   # ∈ [0, 1], linear in angle
 
     # ── Final loss (paper eq. 1: α·ϵs² + β·ϵo²) ──────────────────
-    return alpha * (skel_err ** 2) + beta * (orient_err ** 2)
+    #-- edit addding an extra rule ee matching for better loss landscape, this is not in the original paper but it seems to help with convergence
+    hand_err = jnp.linalg.norm(r_hand - t_hand) / (ell + 1e-8)
+    return alpha * (skel_err ** 2) + beta * (orient_err ** 2) + gamma*(hand_err**2)
 
 loss_and_grad_fn = value_and_grad(ocra_loss)
 

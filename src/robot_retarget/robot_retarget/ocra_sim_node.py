@@ -14,6 +14,7 @@ from scipy.optimize import minimize
 LOOP_RATE = 10
 ALPHA     = 0.67
 BETA      = 0.33
+GAMMA    =  2*ALPHA  # Additional weight for hand position error, not in original paper but helps convergence
 
 JOINT_NAMES = [
     'waist',
@@ -80,7 +81,7 @@ class OCRASimNode(Node):
                                    0.2, 0.0, 0.2,
                                    0.35, 0.0, 0.1,
                                    0.0, 0.0, 0.0, 1.0])
-        dummy_w = jnp.array([ALPHA, BETA])
+        dummy_w = jnp.array([ALPHA, BETA, GAMMA])
         _ = rx_kine.loss_and_grad_fn(dummy_q, dummy_target, dummy_w)
         self.get_logger().info("JAX JIT warmup complete.")
 
@@ -130,7 +131,7 @@ class OCRASimNode(Node):
             val, grad = rx_kine.loss_and_grad_fn(
                 jnp.array(x),
                 jnp.array(self.latest_target_flat),
-                jnp.array([ALPHA, BETA])
+                jnp.array([ALPHA, BETA, GAMMA])
             )
             val_np  = float(val)
             grad_np = np.array(grad, dtype=np.float64)
@@ -176,7 +177,7 @@ class OCRASimNode(Node):
         point.accelerations = [0.0] * 5
 
         # 200ms: enough for controller to execute, short enough for responsiveness
-        point.time_from_start = Duration(sec=0, nanosec=200_000_000)
+        point.time_from_start = Duration(sec=0, nanosec=500_000_000)
 
         msg.points = [point]
         self.cmd_pub.publish(msg)
