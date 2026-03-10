@@ -1,4 +1,4 @@
-# OCRA — Human-to-Robot Arm Motion Retargeting
+# MonkeySee_MonkeyDo — Human-to-Robot Arm Motion Retargeting
 
 Real-time teleoperation of **any URDF-described robot arm** by retargeting human arm motion captured via an **OAK-D depth camera** and **MediaPipe** pose estimation. Implements a modified version of the OCRA algorithm (Optimization-based Customizable Retargeting Algorithm) from Mohan & Kuchenbecker, ICRA Workshop 2023 [[1]](#references), with forward kinematics and gradient computation powered by **JAX** [[2]](#references) and robot-agnostic kinematic modelling via **PyRoki** [[3]](#references).
 
