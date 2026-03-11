@@ -20,14 +20,8 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseArray, Pose
 from std_msgs.msg import String, Bool
-
-ROBOT_UPPER_ARM = 0.3
+ROBOT_UPPER_ARM = 0.30
 ROBOT_FOREARM   = 0.25
-
-# ── Gripper debounce config ───────────────────────────────────────────────────
-CLOSE_THRESH = 0.4   # pinch_ratio below this  → CLOSE (False)
-OPEN_THRESH  = 0.6   # pinch_ratio above this  → OPEN  (True)
-DEBOUNCE_N   = 5     # frames needed to confirm a state change
 
 
 # ── Coordinate helpers ────────────────────────────────────────────────────────
@@ -79,7 +73,7 @@ class CameraTrackerNode(Node):
         super().__init__('camera_tracker')
         self.pub_joints  = self.create_publisher(PoseArray, '/human/skeletal_data', 10)
         self.pub_state   = self.create_publisher(String,    '/mocap/state', 10)
-        self.pub_gripper = self.create_publisher(Bool,      '/human/gripper_cmd', 10)
+        self.pub_gripper = self.create_publisher(Bool,   '/human/gripper_cmd', 10)
 
     def _pose(self, xyz, quat=None):
         p = Pose()
@@ -97,6 +91,7 @@ class CameraTrackerNode(Node):
         msg.header.frame_id = 'mocap_world'
         msg.poses = [self._pose(sh), self._pose(el), self._pose(wr, quat)]
         self.pub_joints.publish(msg)
+
 
     def publish_state(self, s):
         m = String(); m.data = s
@@ -122,8 +117,8 @@ def draw_guide_frame(frame, h, w):
 
 def draw_arm_target(frame, h, w, step):
     """Draw a stick-arm guide showing target pose for each calibration step."""
-    cx, cy = w // 2, h // 2
-    slen   = min(w, h) // 5
+    cx, cy = w // 2, h // 2          # image centre
+    slen   = min(w, h) // 5          # segment length in pixels
 
     shoulder_pt = (cx, cy - slen // 2)
 
@@ -131,10 +126,11 @@ def draw_arm_target(frame, h, w, step):
         cv2.arrowedLine(img, p1, p2, col, 3, cv2.LINE_AA, tipLength=0.25)
 
     if step == "TPOSE":
-        arrow(frame, shoulder_pt, (cx + slen, cy - slen // 2), (0, 255, 255))
-        arrow(frame, shoulder_pt, (cx - slen, cy - slen // 2), (0, 255, 255))
+        # Both arms horizontal
+        arrow(frame, shoulder_pt, (cx + slen, cy - slen // 2), (0,255,255))
+        arrow(frame, shoulder_pt, (cx - slen, cy - slen // 2), (0,255,255))
         cv2.putText(frame, "Hold BOTH arms OUT to sides",
-                    (cx - 160, cy + slen), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 255), 2)
+                    (cx - 160, cy + slen), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0,255,255), 2)
 
 
 def draw_joint_hud(frame, h, w, waist, shoulder, elbow, wrist_a, wrist_r):
@@ -142,7 +138,7 @@ def draw_joint_hud(frame, h, w, waist, shoulder, elbow, wrist_a, wrist_r):
     y0 = h - 130
     cv2.rectangle(frame, (0, y0 - 10), (280, h), (0, 0, 0), -1)
     cv2.putText(frame, "JOINT ANGLES (rad)", (8, y0 + 8),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.48, (160, 160, 160), 1)
+                cv2.FONT_HERSHEY_SIMPLEX, 0.48, (160,160,160), 1)
     labels = [
         f"  Waist   : {waist:+.2f}",
         f"  Shoulder: {shoulder:+.2f}",
@@ -151,10 +147,10 @@ def draw_joint_hud(frame, h, w, waist, shoulder, elbow, wrist_a, wrist_r):
         f"  Wrist-R : {wrist_r:+.2f}   <- rotate palm",
     ]
     colors = [
-        (255, 255, 255), (255, 255, 255),
-        (0, 200, 255),
-        (255, 255, 255),
-        (200, 255, 200),
+        (255,255,255), (255,255,255),
+        (0,200,255),   # highlight elbow in cyan
+        (255,255,255),
+        (200,255,200),
     ]
     for i, (txt, col) in enumerate(zip(labels, colors)):
         cv2.putText(frame, txt, (8, y0 + 28 + i * 20),
@@ -170,61 +166,6 @@ def draw_progress_bar(frame, label, pct, y0, w, color):
     cv2.rectangle(frame, (14, y0 + 36), (14 + bw * pct // 100, y0 + 60), color, -1)
     cv2.putText(frame, f"{pct}%", (14 + bw + 4, y0 + 58),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.58, color, 2)
-
-
-def draw_gripper_hud(frame, w, gripper_state, pinch_ratio, buf_confidence):
-    """
-    On-screen gripper HUD — top-right corner.
-    Shows:
-      • OPEN / CLOSED label with colour coding
-      • Normalised pinch ratio bar
-      • Debounce confidence bar (how many of last N frames agree)
-    """
-    hud_x  = w - 220
-    hud_y  = 10
-    hud_w  = 210
-    hud_h  = 90
-
-    # Background panel
-    cv2.rectangle(frame,
-                  (hud_x - 6, hud_y - 4),
-                  (hud_x + hud_w, hud_y + hud_h),
-                  (20, 20, 20), -1)
-    cv2.rectangle(frame,
-                  (hud_x - 6, hud_y - 4),
-                  (hud_x + hud_w, hud_y + hud_h),
-                  (80, 80, 80), 1)
-
-    # State label
-    label = "GRIPPER: OPEN" if gripper_state else "GRIPPER: CLOSED"
-    color = (0, 255, 80) if gripper_state else (0, 80, 255)
-    cv2.putText(frame, label, (hud_x, hud_y + 20),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.58, color, 2)
-
-    # Pinch ratio bar
-    cv2.putText(frame, "Pinch", (hud_x, hud_y + 42),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.42, (160, 160, 160), 1)
-    bar_w = 140
-    filled = int(np.clip(pinch_ratio / 1.2, 0.0, 1.0) * bar_w)
-    cv2.rectangle(frame, (hud_x + 46, hud_y + 30), (hud_x + 46 + bar_w, hud_y + 44), (50, 50, 50), -1)
-    # Colour shifts green→yellow→red as hand opens (ratio grows)
-    bar_r = int(np.clip(pinch_ratio / 0.6, 0, 1) * 255)
-    bar_g = int(np.clip(1.0 - (pinch_ratio - 0.4) / 0.6, 0, 1) * 200)
-    cv2.rectangle(frame, (hud_x + 46, hud_y + 30), (hud_x + 46 + filled, hud_y + 44), (0, bar_g, bar_r), -1)
-    # CLOSE / OPEN threshold markers
-    close_x = hud_x + 46 + int(CLOSE_THRESH / 1.2 * bar_w)
-    open_x  = hud_x + 46 + int(OPEN_THRESH  / 1.2 * bar_w)
-    cv2.line(frame, (close_x, hud_y + 28), (close_x, hud_y + 46), (0, 200, 255), 1)
-    cv2.line(frame, (open_x,  hud_y + 28), (open_x,  hud_y + 46), (0, 200, 255), 1)
-
-    # Debounce confidence bar
-    cv2.putText(frame, "Conf.", (hud_x, hud_y + 66),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.42, (160, 160, 160), 1)
-    conf_filled = int(buf_confidence * bar_w)
-    cv2.rectangle(frame, (hud_x + 46, hud_y + 54), (hud_x + 46 + bar_w, hud_y + 68), (50, 50, 50), -1)
-    cv2.rectangle(frame, (hud_x + 46, hud_y + 54), (hud_x + 46 + conf_filled, hud_y + 68), (180, 180, 0), -1)
-    cv2.putText(frame, f"{int(buf_confidence*100)}%", (hud_x + 46 + bar_w + 4, hud_y + 66),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 180, 0), 1)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -257,15 +198,13 @@ def main(args=None):
     cur_upper_dir = None
 
     last_hand_quat   = [0., 0., 0., 1.]
-    last_gripper_val = True    # Start OPEN
-    gripper_buf      = []      # Debounce ring buffer
-    last_pinch_ratio = 0.0     # For HUD display
+    last_gripper_val = 1.0
+    frame_idx        = 0
+    banner_timer    = 0
+    BANNER_FRAMES   = 90
 
-    frame_idx    = 0
-    banner_timer = 0
-    BANNER_FRAMES = 90
-
-    hud_angles = [0., 0., 0., 0., 0.]
+    # Live IK angles for HUD
+    hud_angles = [0., 0., 0., 0., 0.]   # [waist, shoulder, elbow, wrist_a, wrist_r]
 
     print("\n[Cal] T-POSE: stretch both arms straight out to the sides.")
     print("      (Hold still for ~3 seconds — auto-detects, then tracking starts)")
@@ -291,12 +230,13 @@ def main(args=None):
             hand_res = hands.process(rgb) if (frame_idx % 2 == 0) else None
             rgb.flags.writeable = True
 
-            # ── Hand orientation + gripper ────────────────────────────────
-            if hand_res and hand_res.multi_hand_world_landmarks:
-                hlm = hand_res.multi_hand_world_landmarks[0].landmark
-                H   = mp_hands.HandLandmark
+            # Create a plain black background for visualization
+            frame = np.zeros_like(frame)
 
-                # --- Hand orientation quaternion ---
+            # ── Hand orientation ──────────────────────────────────────────
+            if hand_res and hand_res.multi_hand_world_landmarks:
+                hlm  = hand_res.multi_hand_world_landmarks[0].landmark
+                H    = mp_hands.HandLandmark
                 wp   = to_mujoco(vec3(hlm[H.WRIST]))
                 im   = to_mujoco(vec3(hlm[H.INDEX_FINGER_MCP]))
                 pm   = to_mujoco(vec3(hlm[H.PINKY_MCP]))
@@ -307,38 +247,30 @@ def main(args=None):
                 zax  = ztmp / (np.linalg.norm(ztmp) + 1e-8)
                 yax  = np.cross(zax, xax)
                 last_hand_quat = rotation_matrix_to_quat(np.column_stack([xax, yax, zax]))
-
-                # --- Normalised pinch ratio ---
-                # Use MIDDLE_FINGER_MCP as palm centre reference (most stable point)
-                thumb      = vec3(hlm[H.THUMB_TIP])
-                index_tip  = vec3(hlm[H.INDEX_FINGER_TIP])
-                wrist_raw  = vec3(hlm[H.WRIST])
-                mid_mcp    = vec3(hlm[H.MIDDLE_FINGER_MCP])
-
-                pinch_dist       = np.linalg.norm(thumb - index_tip)
-                palm_size        = np.linalg.norm(mid_mcp - wrist_raw) + 1e-6
-                last_pinch_ratio = pinch_dist / palm_size   # scale-invariant
-
-                # --- Hysteresis: dead-zone between CLOSE_THRESH and OPEN_THRESH ---
-                if last_pinch_ratio < CLOSE_THRESH:
-                    raw_gripper = False   # closed
-                elif last_pinch_ratio > OPEN_THRESH:
-                    raw_gripper = True    # open
-                else:
-                    raw_gripper = last_gripper_val   # dead-zone → hold current state
-
-                # --- Debounce: majority vote over last DEBOUNCE_N frames ---
-                gripper_buf.append(raw_gripper)
-                if len(gripper_buf) > DEBOUNCE_N:
-                    gripper_buf.pop(0)
-                if len(gripper_buf) == DEBOUNCE_N:
-                    last_gripper_val = (sum(gripper_buf) >= DEBOUNCE_N // 2 + 1)
-
+                
+                # Gripper pinch (Thumb tip to Index tip distance)
+                thumb = vec3(hlm[H.THUMB_TIP])
+                index = vec3(hlm[H.INDEX_FINGER_TIP])
+                wrist = vec3(hlm[H.WRIST])
+                index_mcp = vec3(hlm[H.INDEX_FINGER_MCP])
+                
+                pinch_dist = np.linalg.norm(thumb - index)
+                palm_length = np.linalg.norm(wrist - index_mcp)
+                
+                # Normalize pinch distance by palm length to avoid depth/scaling errors
+                pinch_ratio = pinch_dist / (palm_length + 1e-6)
+                
+                # Apply hysteresis (flicker prevention)
+                if pinch_ratio < 0.4:
+                    last_gripper_val = False  # Closed
+                elif pinch_ratio > 0.7:
+                    last_gripper_val = True   # Open
+                # If between 0.4 and 0.7, keep the last_gripper_val unchanged
                 draw.draw_landmarks(
                     frame, hand_res.multi_hand_landmarks[0],
                     mp_hands.HAND_CONNECTIONS,
-                    draw.DrawingSpec(color=(0, 220, 220), thickness=1, circle_radius=2),
-                    draw.DrawingSpec(color=(0, 180, 180), thickness=1))
+                    draw.DrawingSpec(color=(0,220,220), thickness=1, circle_radius=2),
+                    draw.DrawingSpec(color=(0,180,180), thickness=1))
 
             # ── Pose joints ───────────────────────────────────────────────
             pose_ok = (pose_res.pose_landmarks and pose_res.pose_world_landmarks)
@@ -346,8 +278,8 @@ def main(args=None):
             if pose_ok:
                 draw.draw_landmarks(
                     frame, pose_res.pose_landmarks, mp_pose.POSE_CONNECTIONS,
-                    draw.DrawingSpec(color=(255, 120, 0), thickness=2, circle_radius=3),
-                    draw.DrawingSpec(color=(200,  90, 0), thickness=2))
+                    draw.DrawingSpec(color=(255,120,0), thickness=2, circle_radius=3),
+                    draw.DrawingSpec(color=(200, 90,0), thickness=2))
 
                 WL = pose_res.pose_world_landmarks.landmark
                 PL = pose_res.pose_landmarks.landmark
@@ -371,46 +303,41 @@ def main(args=None):
                     cur_upper_dir = raw_u / ul
                     cur_fore_dir  = raw_f / fl
 
+                    # --- Live IK angles for HUD ---
                     ux, uy, uz = cur_upper_dir
-                    cos_bend   = float(np.clip(np.dot(cur_upper_dir, cur_fore_dir), -1, 1))
+                    cos_bend = float(np.clip(np.dot(cur_upper_dir, cur_fore_dir), -1, 1))
                     waist_v    = float(np.arctan2(ux, uy))
-                    shoulder_v = float(np.arcsin(np.clip(uz, -1, 1))) - np.pi / 2
+                    shoulder_v = float(np.arcsin(np.clip(uz, -1, 1))) - np.pi/2
                     elbow_v    = -np.arccos(cos_bend)
                     wrist_a_v  = -(shoulder_v + elbow_v)
-                    qx, qy, qz, qw = last_hand_quat
+                    qx,qy,qz,qw = last_hand_quat
                     wrist_r_v  = float(np.arctan2(2*(qw*qx+qy*qz), 1-2*(qx*qx+qy*qy)))
                     hud_angles = [waist_v, shoulder_v, elbow_v, wrist_a_v, wrist_r_v]
 
             # ── Guide frame (always shown) ────────────────────────────────
             draw_guide_frame(frame, h, w)
 
-            # ── Gripper HUD (always shown) ────────────────────────────────
-            buf_confidence = (sum(gripper_buf) / len(gripper_buf)) if gripper_buf else 0.5
-            # Flip confidence to reflect agreement with current state
-            if not last_gripper_val:
-                buf_confidence = 1.0 - buf_confidence
-            draw_gripper_hud(frame, w, last_gripper_val, last_pinch_ratio, buf_confidence)
-
             # ════ STATE: TPOSE ════════════════════════════════════════════
             if state == "TPOSE":
                 node.publish_state("CALIBRATION")
                 if pose_ok:
+                    # Both elbows within 8 cm of their shoulder height (Y-axis)
                     right_elbow_level = abs(re[1] - rs[1]) < 0.08
                     left_elbow_level  = abs(le[1] - ls[1]) < 0.08
-                    both_visible      = (rv_el > 0.6 and lv_el > 0.6
-                                         and rv_wr > 0.5 and lv_wr > 0.5)
-                    right_extended    = abs(re[0] - rs[0]) > 0.10
-                    left_extended     = abs(le[0] - ls[0]) > 0.10
+                    # Both elbows must be visible
+                    both_visible = (rv_el > 0.6 and lv_el > 0.6
+                                    and rv_wr > 0.5 and lv_wr > 0.5)
+                    # Arms must be extended outward (elbow X-offset from shoulder)
+                    right_extended = abs(re[0] - rs[0]) > 0.10
+                    left_extended  = abs(le[0] - ls[0]) > 0.10
                     is_t = (both_visible
                             and right_elbow_level and left_elbow_level
                             and right_extended    and left_extended)
                 else:
                     is_t = False
-
                 pct = int(len(c_upper) * 100 / CALIB_N)
                 draw_progress_bar(frame, "T-POSE — stretch BOTH arms out", pct, 0, w, (0, 255, 255))
                 draw_arm_target(frame, h, w, "TPOSE")
-
                 if is_t:
                     cv2.putText(frame, "GOOD — hold still!", (14, 68),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
@@ -421,7 +348,7 @@ def main(args=None):
                         fa = float(np.median(c_fore))
                         scale_upper = ROBOT_UPPER_ARM / ua
                         scale_fore  = ROBOT_FOREARM   / fa
-                        state        = "TRACKING"
+                        state = "TRACKING"
                         banner_timer = BANNER_FRAMES
                         node.get_logger().info(
                             f"T-Pose ✓  upper={ua*100:.1f}cm  fore={fa*100:.1f}cm")
@@ -434,45 +361,58 @@ def main(args=None):
                     cv2.putText(frame, "Not detected — spread arms wide", (14, 68),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.60, (0, 100, 255), 1)
 
+
             # ════ STATE: TRACKING ═════════════════════════════════════════
             elif state == "TRACKING":
                 node.publish_state("TRACKING")
 
                 if banner_timer > 0:
                     banner_timer -= 1
-                    cv2.rectangle(frame, (0, h//2-55), (w, h//2+60), (0, 0, 0), -1)
+                    cv2.rectangle(frame, (0, h//2-55), (w, h//2+60), (0,0,0), -1)
                     cv2.putText(frame, "CALIBRATION COMPLETE",
                                 (w//2-240, h//2-8),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 255, 0), 3)
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0,255,0), 3)
                     cv2.putText(frame, "Tracking Active  |  R = recalibrate",
                                 (w//2-250, h//2+42),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.70, (180, 255, 180), 2)
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.70, (180,255,180), 2)
                 else:
-                    cv2.rectangle(frame, (0, 0), (w, 44), (0, 0, 0), -1)
+                    cv2.rectangle(frame, (0,0), (w, 44), (0,0,0), -1)
                     cv2.putText(frame, "TRACKING  |  R=recalibrate | bend elbow & rotate palm!",
-                                (10, 32), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (0, 255, 0), 2)
+                                (10, 32), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (0,255,0), 2)
 
                 if pose_ok:
                     m_rs = to_mujoco(rs)
                     m_re = to_mujoco(re)
                     m_rw = to_mujoco(rw)
-
+                    
+                    # Apply the calibration scaling factors to the direction vectors
                     u_vec = m_re - m_rs
                     f_vec = m_rw - m_re
-                    ul    = np.linalg.norm(u_vec)
-                    fl    = np.linalg.norm(f_vec)
-
+                    
+                    # Prevent zero division / null vectors
+                    ul = np.linalg.norm(u_vec)
+                    fl = np.linalg.norm(f_vec)
+                    
                     if ul > 1e-4 and fl > 1e-4:
-                        u_scaled   = (u_vec / ul) * ROBOT_UPPER_ARM
-                        f_scaled   = (f_vec / fl) * ROBOT_FOREARM
-                        m_rs_fixed = np.zeros(3)
+                        u_scaled = (u_vec / ul) * ROBOT_UPPER_ARM
+                        f_scaled = (f_vec / fl) * ROBOT_FOREARM
+                        
+                        m_rs_fixed = np.zeros(3) # Shoulder is origin
                         m_re_fixed = m_rs_fixed + u_scaled
                         m_rw_fixed = m_re_fixed + f_scaled
-
-                        node.publish_joints(m_rs_fixed, m_re_fixed, m_rw_fixed, last_hand_quat)
+                        
+                        node.publish_joints(
+                            m_rs_fixed, m_re_fixed, m_rw_fixed, last_hand_quat)
                         node.publish_gripper(last_gripper_val)
 
+                # Live HUD
                 # draw_joint_hud(frame, h, w, *hud_angles)
+
+            # Draw gripper state explicitly on screen for local testing
+            gripper_text = "GRIPPER: OPEN" if last_gripper_val else "GRIPPER: CLOSED"
+            gripper_color = (0, 255, 0) if last_gripper_val else (0, 0, 255)
+            cv2.putText(frame, gripper_text, (w - 200, 30), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.65, gripper_color, 2)
 
             cv2.imshow("Mocap Camera Tracker", frame)
             key = cv2.waitKey(1) & 0xFF
@@ -482,9 +422,8 @@ def main(args=None):
             elif key == ord('r'):
                 state = "TPOSE"
                 c_upper.clear(); c_fore.clear()
-                gripper_buf.clear()
                 cur_upper_dir = None
-                banner_timer  = 0
+                banner_timer = 0
                 print("\n[Cal] Reset — T-POSE to start again.")
 
     cv2.destroyAllWindows()
