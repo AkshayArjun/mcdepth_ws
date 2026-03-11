@@ -1,4 +1,5 @@
-# MonkeySee_MonkeyDo | | Human-to-Robot Arm Motion Retargeting
+# MonkeySee_MonkeyDo 
+## Human-to-Robot Arm Motion Retargeting
 
 Real-time teleoperation of **any URDF-described robot arm** by retargeting human arm motion captured via an **OAK-D depth camera** and **MediaPipe** pose estimation. Implements a modified version of the OCRA algorithm (Optimization-based Customizable Retargeting Algorithm) from Mohan & Kuchenbecker, ICRA Workshop 2023 [[1]](#references), with forward kinematics and gradient computation powered by **JAX** [[2]](#references) and robot-agnostic kinematic modelling via **PyRoki** [[3]](#references).
 
@@ -322,21 +323,9 @@ No FK code changes are required.
 
 ---
 
-## Bugs Fixed During Development
+## Demo 
 
-| Bug | Impact |
-|---|---|
-| Missing skeleton normalisation factor ℓ | Loss terms on incompatible scales |
-| `arccos` instead of `arctan2` for orientation | NaN gradients at identity rotation |
-| Scale factors computed but not applied in camera_tracker | Human arm never rescaled to robot proportions |
-| Wrong message type for `/joint_states` | Joint state callback never fired |
-| Joint name ordering assumed, not looked up | Wrong joints moved |
-| Missing comma in `JOINT_NAMES` list | Python silently concatenated strings |
-| JAX DeviceArray passed directly to scipy | "Inequality constraints incompatible" error |
-| `MultiThreadedExecutor` flooding controller | Trajectory preempted before execution |
-| `jnp.minimum` in distance → zero gradient | Optimiser made no progress |
 
----
 
 ## Known Limitations
 
