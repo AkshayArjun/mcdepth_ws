@@ -239,10 +239,10 @@ sudo apt install ros-humble-rosbridge-suite
 
 ```bash
 # Core
-pip install jax jaxlib scipy numpy --break-system-packages
+pip install jax jaxlib scipy numpy 
 
 # PyRoki — robot-agnostic FK and kinematic optimisation
-pip install pyroki --break-system-packages
+install from source
 
 # Camera tracker only
 pip install depthai mediapipe --break-system-packages
