@@ -325,9 +325,9 @@ No FK code changes are required.
 
 ## Demo 
 
-<div align="center">
-  <video src="https://github.com/AkshayArjun/MonkeySee_MonkeyDo/raw/master/media/demonstration.mp4" width="100%" controls></video>
-</div>
+![Demonstration Video](media/demonstration.mp4)
+
+[Direct link to video](https://github.com/AkshayArjun/MonkeySee_MonkeyDo/raw/master/media/demonstration.mp4)
 
 
 
