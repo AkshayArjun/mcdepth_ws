@@ -212,11 +212,13 @@ loss_and_grad_fn = jax.value_and_grad(ocra_loss)
 ## Repository Structure
 
 ```
+camera_tracker/
+├── camera_tracker.py       # OAK-D + MediaPipe → PoseArray publisher
+
 robot_retarget/
 ├── rx200_kinematics.py     # JAX OCRA loss + value_and_grad (PyRoki FK)
 ├── ocra_sim_node.py        # ROS2 node → Gazebo (JointTrajectoryController)
 ├── ocra_node.py            # ROS2 node → hardware (action client)
-├── camera_tracker.py       # OAK-D + MediaPipe → PoseArray publisher
 ├── fake_skele_pub.py       # Synthetic skeleton for testing without camera
 └── ocra_visualizer.html    # Live browser visualiser (via rosbridge)
 ```
